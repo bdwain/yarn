@@ -585,6 +585,7 @@ export class Install {
         await this.linker.init(flattenedTopLevelPatterns, workspaceLayout, {
           linkDuplicates: this.flags.linkDuplicates,
           ignoreOptional: this.flags.ignoreOptional,
+          isolated: this.flags.isolated
         });
       }),
     );

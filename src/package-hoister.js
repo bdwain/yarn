@@ -69,9 +69,10 @@ export class HoistManifest {
 }
 
 export default class PackageHoister {
-  constructor(config: Config, resolver: PackageResolver, {ignoreOptional}: {ignoreOptional: ?boolean} = {}) {
+  constructor(config: Config, resolver: PackageResolver, {ignoreOptional, isolated}: {ignoreOptional: ?boolean, isolated: ?boolean} = {}) {
     this.resolver = resolver;
     this.config = config;
+    this.isolated = isolated;
 
     this.ignoreOptional = ignoreOptional;
 
@@ -648,7 +649,6 @@ export default class PackageHoister {
 
   init(): HoistManifestTuples {
     const flatTree = [];
-
     //
     for (const [key, info] of this.tree.entries()) {
       // decompress the location and push it to the flat tree. this path could be made
@@ -669,7 +669,7 @@ export default class PackageHoister {
         parts.splice(0, 1, this.config.modulesFolder);
       } else {
         // first part will be the registry-specific module folder
-        parts.splice(0, 0, this.config.lockfileFolder);
+        parts.splice(0, 0, this.isolated ? this.config.cwd : this.config.lockfileFolder);
       }
 
       const loc = path.join(...parts);
