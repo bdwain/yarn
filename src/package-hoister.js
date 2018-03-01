@@ -69,10 +69,9 @@ export class HoistManifest {
 }
 
 export default class PackageHoister {
-  constructor(config: Config, resolver: PackageResolver, {ignoreOptional, isolated}: {ignoreOptional: ?boolean, isolated: ?boolean} = {}) {
+  constructor(config: Config, resolver: PackageResolver, {ignoreOptional}: {ignoreOptional: ?boolean} = {}) {
     this.resolver = resolver;
     this.config = config;
-    this.isolated = isolated;
 
     this.ignoreOptional = ignoreOptional;
 
@@ -669,7 +668,7 @@ export default class PackageHoister {
         parts.splice(0, 1, this.config.modulesFolder);
       } else {
         // first part will be the registry-specific module folder
-        parts.splice(0, 0, this.isolated ? this.config.cwd : this.config.lockfileFolder);
+        parts.splice(0, 0, this.config.rootFolder);
       }
 
       const loc = path.join(...parts);

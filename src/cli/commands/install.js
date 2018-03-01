@@ -229,18 +229,13 @@ export class Install {
     const usedPatterns = [];
     let workspaceLayout;
 
-    // some commands should always run in the context of the entire workspace unless isolated
-    let cwd;
-    if(!this.flags.isolated && (this.flags.includeWorkspaceDeps || this.flags.workspaceRootIsCwd)){
-      cwd = this.config.lockfileFolder;
-    }
-    else{
-      cwd = this.config.cwd;
-    }
+    // some commands should always run in the context of the entire workspace
+    const cwd =
+      this.flags.includeWorkspaceDeps || this.flags.workspaceRootIsCwd ? this.config.rootFolder : this.config.cwd;
 
-    // isolated workspaces and non-workspaces are always root, otherwise check for workspace root
-    const cwdIsRoot = this.flags.isolated || !this.config.workspaceRootFolder || this.config.lockfileFolder === cwd;
-    
+    // non-workspaces are always root, otherwise check for workspace root
+    const cwdIsRoot = !this.config.workspaceRootFolder || this.config.rootFolder === cwd;
+
     // exclude package names that are in install args
     const excludeNames = [];
     for (const pattern of excludePatterns) {
@@ -332,7 +327,7 @@ export class Install {
       }
 
       if (!this.flags.isolated && this.config.workspaceRootFolder) {
-        const workspaceLoc = cwdIsRoot ? loc : path.join(this.config.lockfileFolder, filename);
+        const workspaceLoc = cwdIsRoot ? loc : path.join(this.config.rootFolder, filename);
         const workspacesRoot = path.dirname(workspaceLoc);
 
         let workspaceManifestJson = projectManifestJson;
@@ -469,8 +464,7 @@ export class Install {
 
     for (const registryName of this.rootManifestRegistries) {
       const {folder} = this.config.registries[registryName];
-      const rootFolder = this.flags.isolated ? this.config.cwd : this.config.lockfileFolder;
-      await fs.mkdirp(path.join(rootFolder, folder));
+      await fs.mkdirp(path.join(this.config.rootFolder, folder));
     }
   }
 
@@ -505,6 +499,16 @@ export class Install {
     return this.flatten(rawPatterns);
   }
 
+  async _shrinkwrapExists(): Promise<boolean>{
+    if (await fs.exists(path.join(this.config.lockfileFolder, 'npm-shrinkwrap.json'))) {
+      return true;
+    }
+    if(this.config.lockfileFolder === this.config.rootFolder){
+      return false;
+    }
+    return await fs.exists(path.join(this.config.rootFolder, 'npm-shrinkwrap.json'));
+  }
+
   /**
    * TODO description
    */
@@ -519,7 +523,7 @@ export class Install {
     }
 
     // warn if we have a shrinkwrap
-    if (await fs.exists(path.join(this.config.lockfileFolder, 'npm-shrinkwrap.json'))) {
+    if (this._shrinkwrapExists()) {
       this.reporter.warn(this.reporter.lang('shrinkwrapWarning'));
     }
 
@@ -534,7 +538,7 @@ export class Install {
     } = await this.fetchRequestFromCwd();
     let topLevelPatterns: Array<string> = [];
 
-    const artifacts = await this.integrityChecker.getArtifacts(this.flags);
+    const artifacts = await this.integrityChecker.getArtifacts();
     if (artifacts) {
       this.linker.setArtifacts(artifacts);
       this.scripts.setArtifacts(artifacts);
@@ -575,17 +579,16 @@ export class Install {
     steps.push((curr: number, total: number) =>
       callThroughHook('linkStep', async () => {
         // remove integrity hash to make this operation atomic
-        await this.integrityChecker.removeIntegrityFile(this.flags);
+        await this.integrityChecker.removeIntegrityFile();
         this.reporter.step(curr, total, this.reporter.lang('linkingDependencies'), emoji.get('link'));
         flattenedTopLevelPatterns = this.preparePatternsForLinking(
           flattenedTopLevelPatterns,
           manifest,
-          this.flags.isolated || this.config.lockfileFolder === this.config.cwd,
+          this.config.rootFolder === this.config.cwd,
         );
         await this.linker.init(flattenedTopLevelPatterns, workspaceLayout, {
           linkDuplicates: this.flags.linkDuplicates,
-          ignoreOptional: this.flags.ignoreOptional,
-          isolated: this.flags.isolated
+          ignoreOptional: this.flags.ignoreOptional
         });
       }),
     );
@@ -657,7 +660,7 @@ export class Install {
    */
 
   shouldClean(): Promise<boolean> {
-    return fs.exists(path.join(this.config.lockfileFolder, constants.CLEAN_FILENAME));
+    return fs.exists(path.join(this.config.rootFolder, constants.CLEAN_FILENAME));
   }
 
   /**

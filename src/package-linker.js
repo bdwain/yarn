@@ -140,8 +140,8 @@ export default class PackageLinker {
     }
   }
 
-  getFlatHoistedTree(patterns: Array<string>, {ignoreOptional, isolated}: {ignoreOptional: ?boolean, isolated: ?boolean} = {}): HoistManifestTuples {
-    const hoister = new PackageHoister(this.config, this.resolver, {ignoreOptional, isolated});
+  getFlatHoistedTree(patterns: Array<string>, {ignoreOptional}: {ignoreOptional: ?boolean} = {}): HoistManifestTuples {
+    const hoister = new PackageHoister(this.config, this.resolver, {ignoreOptional});
     hoister.seed(patterns);
     return hoister.init();
   }
@@ -149,9 +149,9 @@ export default class PackageLinker {
   async copyModules(
     patterns: Array<string>,
     workspaceLayout?: WorkspaceLayout,
-    {linkDuplicates, ignoreOptional, isolated}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean, isolated: ?boolean} = {},
+    {linkDuplicates, ignoreOptional}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean} = {},
   ): Promise<void> {
-    let flatTree = this.getFlatHoistedTree(patterns, {ignoreOptional, isolated});
+    let flatTree = this.getFlatHoistedTree(patterns, {ignoreOptional});
     // sorted tree makes file creation and copying not to interfere with each other
     flatTree = flatTree.sort(function(dep1, dep2): number {
       return dep1[0].localeCompare(dep2[0]);
@@ -272,7 +272,7 @@ export default class PackageLinker {
       }
     };
 
-    await findExtraneousFiles(isolated ? this.config.cwd : this.config.lockfileFolder);
+    await findExtraneousFiles(this.config.rootFolder);
     if (workspaceLayout) {
       for (const workspaceName of Object.keys(workspaceLayout.workspaces)) {
         await findExtraneousFiles(workspaceLayout.workspaces[workspaceName].loc);
@@ -422,7 +422,7 @@ export default class PackageLinker {
         topLevelDependencies,
         async ([dest, {pkg}]) => {
           if (pkg._reference && pkg._reference.location && pkg.bin && Object.keys(pkg.bin).length) {
-            const binLoc = path.join(isolated ? this.config.cwd : this.config.lockfileFolder, this.config.getFolder(pkg));
+            const binLoc = path.join(this.config.rootFolder, this.config.getFolder(pkg));
             await this.linkSelfDependencies(pkg, dest, binLoc);
             tickBin();
           }
@@ -555,9 +555,9 @@ export default class PackageLinker {
   async init(
     patterns: Array<string>,
     workspaceLayout?: WorkspaceLayout,
-    {linkDuplicates, ignoreOptional, isolated}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean, isolated: ?boolean} = {},
+    {linkDuplicates, ignoreOptional}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean} = {},
   ): Promise<void> {
     this.resolvePeerModules();
-    await this.copyModules(patterns, workspaceLayout, {linkDuplicates, ignoreOptional, isolated});
+    await this.copyModules(patterns, workspaceLayout, {linkDuplicates, ignoreOptional});
   }
 }

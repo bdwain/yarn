@@ -492,6 +492,7 @@ export function main({
       nonInteractive: commander.nonInteractive,
       scriptsPrependNodePath: commander.scriptsPrependNodePath,
       updateChecksums: commander.updateChecksums,
+      isolated: commander.isolated
     })
     .then(() => {
       // lockfile check must happen after config.init sets lockfileFolder

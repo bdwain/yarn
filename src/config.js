@@ -48,6 +48,7 @@ export type ConfigOptions = {
   networkTimeout?: number,
   nonInteractive?: boolean,
   scriptsPrependNodePath?: boolean,
+  isolated?: boolean,
 
   // Loosely compare semver for invalid cases like "0.01.0"
   looseSemver?: ?boolean,
@@ -226,7 +227,8 @@ export default class Config {
 
     this.workspaceRootFolder = await this.findWorkspaceRoot(this.cwd);
     this.lockfileFolder = this.workspaceRootFolder || this.cwd;
-
+    this.rootFolder = this.isolated ? this.cwd : this.lockfileFolder;
+    
     this.linkedModules = [];
 
     let linkedModules;
@@ -359,6 +361,7 @@ export default class Config {
     this.registryFolders = [];
     this.linkedModules = [];
 
+
     this.registries = map();
     this.cache = map();
 
@@ -369,6 +372,7 @@ export default class Config {
 
     this.commandName = opts.commandName || '';
 
+    this.isolated = !!opts.isolated;
     this.preferOffline = !!opts.preferOffline;
     this.modulesFolder = opts.modulesFolder;
     this.globalFolder = opts.globalFolder || constants.GLOBAL_MODULE_DIRECTORY;
