@@ -199,6 +199,7 @@ const messages = {
   workspaceVersionMandatory: 'Missing version in workspace at $0, ignoring.',
   workspaceNameMandatory: 'Missing name in workspace at $0, ignoring.',
   workspaceNameDuplicate: 'There are more than one workspace with name $0',
+  workspaceRootIsolatedFlag: 'This command can not be run with --isolated at the workspace root. --isolated can only be used in an individual workspace.',
 
   cacheFolderSkipped: 'Skipping preferred cache folder $0 because it is not writable.',
   cacheFolderMissing:

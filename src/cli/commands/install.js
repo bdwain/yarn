@@ -63,6 +63,7 @@ type Flags = {
   frozenLockfile: boolean,
   skipIntegrityCheck: boolean,
   checkFiles: boolean,
+  isolated: boolean,
 
   // add
   peer: boolean,
@@ -141,6 +142,7 @@ function normalizeFlags(config: Config, rawFlags: Object): Flags {
     frozenLockfile: !!rawFlags.frozenLockfile,
     linkDuplicates: !!rawFlags.linkDuplicates,
     checkFiles: !!rawFlags.checkFiles,
+    isolated: !!rawFlags.isolated,
 
     // add
     peer: !!rawFlags.peer,
@@ -227,13 +229,18 @@ export class Install {
     const usedPatterns = [];
     let workspaceLayout;
 
-    // some commands should always run in the context of the entire workspace
-    const cwd =
-      this.flags.includeWorkspaceDeps || this.flags.workspaceRootIsCwd ? this.config.lockfileFolder : this.config.cwd;
+    // some commands should always run in the context of the entire workspace unless isolated
+    let cwd;
+    if(!this.flags.isolated && (this.flags.includeWorkspaceDeps || this.flags.workspaceRootIsCwd)){
+      cwd = this.config.lockfileFolder;
+    }
+    else{
+      cwd = this.config.cwd;
+    }
 
-    // non-workspaces are always root, otherwise check for workspace root
-    const cwdIsRoot = !this.config.workspaceRootFolder || this.config.lockfileFolder === cwd;
-
+    // isolated workspaces and non-workspaces are always root, otherwise check for workspace root
+    const cwdIsRoot = this.flags.isolated || !this.config.workspaceRootFolder || this.config.lockfileFolder === cwd;
+    
     // exclude package names that are in install args
     const excludeNames = [];
     for (const pattern of excludePatterns) {
@@ -324,7 +331,7 @@ export class Install {
         pushDeps('optionalDependencies', projectManifestJson, {hint: 'optional', optional: true}, true);
       }
 
-      if (this.config.workspaceRootFolder) {
+      if (!this.flags.isolated && this.config.workspaceRootFolder) {
         const workspaceLoc = cwdIsRoot ? loc : path.join(this.config.lockfileFolder, filename);
         const workspacesRoot = path.dirname(workspaceLoc);
 
@@ -462,7 +469,8 @@ export class Install {
 
     for (const registryName of this.rootManifestRegistries) {
       const {folder} = this.config.registries[registryName];
-      await fs.mkdirp(path.join(this.config.lockfileFolder, folder));
+      const rootFolder = this.flags.isolated ? this.config.cwd : this.config.lockfileFolder;
+      await fs.mkdirp(path.join(rootFolder, folder));
     }
   }
 
@@ -504,6 +512,12 @@ export class Install {
   async init(): Promise<Array<string>> {
     this.checkUpdate();
 
+    const isWorkspaceRoot = this.config.workspaceRootFolder && this.config.cwd === this.config.workspaceRootFolder;
+    // running "yarn add something" in a workspace root is often a mistake
+    if (isWorkspaceRoot && this.flags.isolated) {
+      throw new MessageError(this.reporter.lang('workspaceRootIsolatedFlag'));
+    }
+
     // warn if we have a shrinkwrap
     if (await fs.exists(path.join(this.config.lockfileFolder, 'npm-shrinkwrap.json'))) {
       this.reporter.warn(this.reporter.lang('shrinkwrapWarning'));
@@ -520,7 +534,7 @@ export class Install {
     } = await this.fetchRequestFromCwd();
     let topLevelPatterns: Array<string> = [];
 
-    const artifacts = await this.integrityChecker.getArtifacts();
+    const artifacts = await this.integrityChecker.getArtifacts(this.flags);
     if (artifacts) {
       this.linker.setArtifacts(artifacts);
       this.scripts.setArtifacts(artifacts);
@@ -561,12 +575,12 @@ export class Install {
     steps.push((curr: number, total: number) =>
       callThroughHook('linkStep', async () => {
         // remove integrity hash to make this operation atomic
-        await this.integrityChecker.removeIntegrityFile();
+        await this.integrityChecker.removeIntegrityFile(this.flags);
         this.reporter.step(curr, total, this.reporter.lang('linkingDependencies'), emoji.get('link'));
         flattenedTopLevelPatterns = this.preparePatternsForLinking(
           flattenedTopLevelPatterns,
           manifest,
-          this.config.lockfileFolder === this.config.cwd,
+          this.flags.isolated || this.config.lockfileFolder === this.config.cwd,
         );
         await this.linker.init(flattenedTopLevelPatterns, workspaceLayout, {
           linkDuplicates: this.flags.linkDuplicates,

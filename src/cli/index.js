@@ -75,6 +75,7 @@ export function main({
   commander.option('--no-lockfile', "don't read or generate a lockfile");
   commander.option('--pure-lockfile', "don't generate a lockfile");
   commander.option('--frozen-lockfile', "don't generate a lockfile and fail if an update is needed");
+  commander.option('--isolated', 'do not a workspace in the context of its root directory');
   commander.option('--update-checksums', 'update package checksums from current repository');
   commander.option('--link-duplicates', 'create hardlinks to the repeated modules in node_modules');
   commander.option('--link-folder <path>', 'specify a custom folder to store global links');
