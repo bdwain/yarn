@@ -818,7 +818,7 @@ export class Install {
     );
 
     // --no-lockfile or --pure-lockfile or --frozen-lockfile flag
-    if (this.flags.lockfile === false || this.flags.pureLockfile || this.flags.frozenLockfile) {
+    if (this.flags.lockfile === false || this.flags.pureLockfile || this.flags.isolated || this.flags.frozenLockfile) {
       return;
     }
 
