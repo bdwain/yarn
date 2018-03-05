@@ -523,7 +523,7 @@ export class Install {
     }
 
     // warn if we have a shrinkwrap
-    if (this._shrinkwrapExists()) {
+    if (await this._shrinkwrapExists()) {
       this.reporter.warn(this.reporter.lang('shrinkwrapWarning'));
     }
 
