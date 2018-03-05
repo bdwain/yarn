@@ -30,7 +30,7 @@ export default (async function(info: Object, moduleLoc: string, config: Config, 
   }
 
   await fix(info, moduleLoc, config.reporter, warn, config.looseSemver);
-  resolveRelative(info, moduleLoc, config.lockfileFolder);
+  resolveRelative(info, moduleLoc, config.rootFolder);
 
   if (config.cwd === config.globalFolder) {
     return info;

@@ -383,7 +383,7 @@ export default class InstallationIntegrityChecker {
     if (integrityMatches === 'OK') {
       invariant(expected, "The integrity shouldn't pass without integrity file");
       for (const modulesFolder of expected.modulesFolders) {
-        if (!await fs.exists(path.join(this.config.lockfileFolder, modulesFolder))) {
+        if (!await fs.exists(path.join(this.config.rootFolder, modulesFolder))) {
           integrityMatches = 'MODULES_FOLDERS_MISSING';
         }
       }

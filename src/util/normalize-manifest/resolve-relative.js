@@ -7,11 +7,11 @@ import invariant from 'invariant';
 
 const path = require('path');
 
-export default function(info: Object, moduleLoc: string, lockfileFolder: string) {
+export default function(info: Object, moduleLoc: string, rootFolder: string) {
   // It won't work if we don't yet know what's the folder we'll use as root. It's not a
   // big deal tho, because it only happens when trying to figure out the root, and we
   // don't need to know the dependencies / devDependencies at this time.
-  if (!lockfileFolder) {
+  if (!rootFolder) {
     return;
   }
 
@@ -41,8 +41,8 @@ export default function(info: Object, moduleLoc: string, lockfileFolder: string)
       const unprefixed = value.substr(prefix.length);
       const hasPathPrefix = /^\.(\/|$)/.test(unprefixed);
 
-      const absoluteTarget = path.resolve(lockfileFolder, moduleLoc, unprefixed);
-      let relativeTarget = path.relative(lockfileFolder, absoluteTarget) || '.';
+      const absoluteTarget = path.resolve(rootFolder, moduleLoc, unprefixed);
+      let relativeTarget = path.relative(rootFolder, absoluteTarget) || '.';
 
       if (hasPathPrefix) {
         // TODO: This logic should be removed during the next major bump
