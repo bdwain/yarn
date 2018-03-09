@@ -22,6 +22,7 @@ import * as import_ from './import.js';
 import * as info from './info.js';
 import * as init from './init.js';
 import * as install from './install.js';
+import * as isolate from './isolate.js';
 import * as licenses from './licenses.js';
 import * as link from './link.js';
 import * as login from './login.js';
@@ -65,6 +66,7 @@ const commands = {
   info,
   init,
   install,
+  isolate,
   licenses,
   link,
   lockfile: buildUseless("The lockfile command isn't necessary. `yarn install` will produce a lockfile."),

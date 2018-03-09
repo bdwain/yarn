@@ -77,6 +77,9 @@ type Flags = {
 
   // remove, upgrade
   workspaceRootIsCwd: boolean,
+
+  // isolate
+  isolate: boolean
 };
 
 /**
@@ -155,6 +158,9 @@ function normalizeFlags(config: Config, rawFlags: Object): Flags {
 
     // add, remove, update
     workspaceRootIsCwd: rawFlags.workspaceRootIsCwd !== false,
+
+    // isolate
+    isolated: !!rawFlags.isolated
   };
 
   if (config.getOption('ignore-scripts')) {
