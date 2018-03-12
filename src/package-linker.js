@@ -157,7 +157,7 @@ export default class PackageLinker {
   async copyModules(
     patterns: Array<string>,
     workspaceLayout?: WorkspaceLayout,
-    {linkDuplicates, ignoreOptional}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean} = {},
+    {linkDuplicates, ignoreOptional, isolated}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean, isolated: ?boolean} = {},
   ): Promise<void> {
     let flatTree = this.getFlatHoistedTree(patterns, {ignoreOptional});
     // sorted tree makes file creation and copying not to interfere with each other
@@ -281,10 +281,12 @@ export default class PackageLinker {
       }
     };
 
-    await findExtraneousFiles(this.config.lockfileFolder);
-    if (workspaceLayout) {
-      for (const workspaceName of Object.keys(workspaceLayout.workspaces)) {
-        await findExtraneousFiles(workspaceLayout.workspaces[workspaceName].loc);
+    if(!isolated){
+      await findExtraneousFiles(this.config.lockfileFolder);
+      if (workspaceLayout) {
+        for (const workspaceName of Object.keys(workspaceLayout.workspaces)) {
+          await findExtraneousFiles(workspaceLayout.workspaces[workspaceName].loc);
+        }
       }
     }
 
@@ -593,9 +595,11 @@ export default class PackageLinker {
   async init(
     patterns: Array<string>,
     workspaceLayout?: WorkspaceLayout,
-    {linkDuplicates, ignoreOptional}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean} = {},
+    {linkDuplicates, ignoreOptional, isolated}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean, isolated: ?boolean} = {},
   ): Promise<void> {
-    this.resolvePeerModules();
-    await this.copyModules(patterns, workspaceLayout, {linkDuplicates, ignoreOptional});
+    if(!isolated){
+      this.resolvePeerModules();
+    }
+    await this.copyModules(patterns, workspaceLayout, {linkDuplicates, ignoreOptional, isolated});
   }
 }

@@ -41,6 +41,7 @@ export default class PackageRequest {
     this.pattern = req.pattern;
     this.config = resolver.config;
     this.foundInfo = null;
+    this.shallow = resolver.shallow;
   }
 
   init() {
@@ -58,6 +59,7 @@ export default class PackageRequest {
   optional: boolean;
   hint: ?constants.RequestHint;
   foundInfo: ?Manifest;
+  shallow: boolean;
 
   getLocked(remoteType: FetcherNames): ?Manifest {
     // always prioritise root lockfile
@@ -265,6 +267,11 @@ export default class PackageRequest {
     info._reference = ref;
     info._remote = remote;
     // start installation of dependencies
+
+    if(this.shallow){
+      return;
+    }
+
     const promises = [];
     const deps = [];
     const parentNames = [...this.parentNames, name];

@@ -75,11 +75,11 @@ type Flags = {
   // outdated, update-interactive
   includeWorkspaceDeps: boolean,
 
-  // remove, upgrade
+  // add, remove, upgrade, isolate
   workspaceRootIsCwd: boolean,
 
-  // isolate
-  isolate: boolean
+  // isolated
+  isolated: boolean
 };
 
 /**
@@ -329,13 +329,13 @@ export class Install {
         }
       };
 
-      if (cwdIsRoot) {
+      if (cwdIsRoot || this.flags.isolated) {
         pushDeps('dependencies', projectManifestJson, {hint: null, optional: false}, true);
         pushDeps('devDependencies', projectManifestJson, {hint: 'dev', optional: false}, !this.config.production);
         pushDeps('optionalDependencies', projectManifestJson, {hint: 'optional', optional: true}, true);
       }
 
-      if (this.config.workspaceRootFolder) {
+      if (this.config.workspaceRootFolder && !this.flags.isolated) {
         const workspaceLoc = cwdIsRoot ? loc : path.join(this.config.lockfileFolder, filename);
         const workspacesRoot = path.dirname(workspaceLoc);
 
@@ -552,6 +552,7 @@ export class Install {
           isFlat: this.flags.flat,
           isFrozen: this.flags.frozenLockfile,
           workspaceLayout,
+          shallow: this.flags.isolated,
         });
         topLevelPatterns = this.preparePatterns(rawPatterns);
         flattenedTopLevelPatterns = await this.flatten(topLevelPatterns);
@@ -582,6 +583,7 @@ export class Install {
         await this.linker.init(flattenedTopLevelPatterns, workspaceLayout, {
           linkDuplicates: this.flags.linkDuplicates,
           ignoreOptional: this.flags.ignoreOptional,
+          isolated: this.flags.isolated
         });
       }),
     );
@@ -636,11 +638,12 @@ export class Install {
     // fin!
     // The second condition is to make sure lockfile can be updated when running `remove` command.
     if (
-      topLevelPatterns.length ||
-      (await fs.exists(path.join(this.config.lockfileFolder, constants.LOCKFILE_FILENAME)))
+      !this.flags.isolated &&
+      (topLevelPatterns.length ||
+      (await fs.exists(path.join(this.config.lockfileFolder, constants.LOCKFILE_FILENAME))))
     ) {
       await this.saveLockfileAndIntegrity(topLevelPatterns, workspaceLayout);
-    } else {
+    } else if(!this.flags.isolated){
       this.reporter.info(this.reporter.lang('notSavedLockfileNoDependencies'));
     }
     this.maybeOutputUpdate();

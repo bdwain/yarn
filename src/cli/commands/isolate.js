@@ -26,7 +26,7 @@ export class Isolate extends Install {
     super(_flags, config, reporter, lockfile);
   }
 
-  siblingWorkspaces: Array<string>;
+  nonWorkspaceDeps: Array<string>;
 
   async init(): Promise<Array<string>> {
     // running "yarn isolate" in a workspace root is not allowed
@@ -34,13 +34,15 @@ export class Isolate extends Install {
       throw new MessageError(this.reporter.lang('workspacesIsolateRootCheck'));
     }
 
-    await this.setSiblingWorkspaces();
+    await this.setNonWorkspaceDeps();
     
     const patterns = await Install.prototype.init.call(this);
     return patterns;
   }
 
-  async setSiblingWorkspaces(): Array<string>{
+  async setNonWorkspaceDeps(): Array<string>{
+    this.nonWorkspaceDeps = [];
+
     let foundRegistry = false, rootLoc, workspaceLoc;
     for (const registry of Object.keys(registries)) {
       const {filename} = registries[registry];
@@ -65,159 +67,28 @@ export class Isolate extends Install {
     const workspaceManifest = await this.config.readJson(workspaceLoc);
     await normalizeManifest(workspaceManifest, this.config.cwd, this.config, false);
 
-    const currentWorkspace = workspaceManifest.name;
-    const allWorkspaces = await this.config.resolveWorkspaces(this.config.lockfileFolder, rootManifest);
-    this.siblingWorkspaces = Object.keys(allWorkspaces).filter(w => w !== currentWorkspace).map(w => {
-      return `${w}@${allWorkspaces[w].manifest.version}`
-    });
+    const allWorkspaces = Object.keys(await this.config.resolveWorkspaces(this.config.lockfileFolder, rootManifest));
+    this.nonWorkspaceDeps = this._getAllWorkspaceDeps(workspaceManifest).filter(w => !allWorkspaces.includes(w));
   }
 
-  prepareRequests(requests: DependencyRequestPatterns): DependencyRequestPatterns {
-    const requestsWithArgs = requests.slice();
-
-    for (const workspace of this.siblingWorkspaces) {
-      requestsWithArgs.push({
-        pattern: workspace,
-        registry: 'npm',
-        optional: false,
-      });
-    }
-    return requestsWithArgs;
-  }
-
-  /**
-   * returns version for a pattern based on Manifest
-   */
-  getPatternVersion(pattern: string, pkg: Manifest): string {
-    const tilde = this.flags.tilde;
-    const configPrefix = String(this.config.getOption('save-prefix'));
-    const exact = this.flags.exact || Boolean(this.config.getOption('save-exact')) || configPrefix === '';
-    const {hasVersion, range} = normalizePattern(pattern);
-    let version;
-
-    if (getExoticResolver(pattern)) {
-      // wasn't a name/range tuple so this is just a raw exotic pattern
-      version = pattern;
-    } else if (hasVersion && range && (semver.satisfies(pkg.version, range) || getExoticResolver(range))) {
-      // if the user specified a range then use it verbatim
-      version = range;
-    }
-
-    if (!version || semver.valid(version)) {
-      let prefix = configPrefix || '^';
-
-      if (tilde) {
-        prefix = '~';
-      } else if (version || exact) {
-        prefix = '';
-      }
-      version = `${prefix}${pkg.version}`;
-    }
-
-    return version;
-  }
-
-  preparePatterns(patterns: Array<string>): Array<string> {
-    const preparedPatterns = patterns.slice();
-    for (const pattern of this.siblingWorkspaces) {
-      const pkg = this.resolver.getResolvedPattern(pattern);
-      const version = this.getPatternVersion(pattern, pkg);
-      const newPattern = `${pkg.name}@${version}`;
-      preparedPatterns.push(newPattern);
-      if (newPattern === pattern) {
-        continue;
-      }
-      this.resolver.replacePattern(pattern, newPattern);
-    }
-    return preparedPatterns;
-  }
-
-  preparePatternsForLinking(patterns: Array<string>, cwdManifest: Manifest, cwdIsRoot: boolean): Array<string> {
-    // remove the newly added patterns if cwd != root and update the in-memory package dependency instead
-    if (cwdIsRoot) {
-      return patterns;
-    }
-
-    let manifest;
-    const cwdPackage = `${cwdManifest.name}@${cwdManifest.version}`;
-    try {
-      manifest = this.resolver.getStrictResolvedPattern(cwdPackage);
-    } catch (e) {
-      this.reporter.warn(this.reporter.lang('unknownPackage', cwdPackage));
-      return patterns;
-    }
-
-    let newPatterns = patterns;
-    this._iterateAddedPackages((pattern, registry, dependencyType, pkgName, version) => {
-      // remove added package from patterns list
-      const filtered = newPatterns.filter(p => p !== pattern);
-      invariant(
-        newPatterns.length - filtered.length > 0,
-        `expect added pattern '${pattern}' in the list: ${patterns.toString()}`,
-      );
-      newPatterns = filtered;
-
-      // add new package into in-memory manifest so they can be linked properly
-      manifest[dependencyType] = manifest[dependencyType] || {};
-      if (manifest[dependencyType][pkgName] === version) {
-        // package already existed
+  _getAllWorkspaceDeps(manifest: Object): Array<string>{
+    const depTypes = ['dependencies', 'devDependencies', 'optionalDependencies'];
+    let result = [];
+    depTypes.forEach(type => {
+      if(!manifest[type]){
         return;
       }
-
-      // update dependencies in the manifest
-      invariant(manifest._reference, 'manifest._reference should not be null');
-      const ref: Object = manifest._reference;
-
-      ref['dependencies'] = ref['dependencies'] || [];
-      ref['dependencies'].push(pattern);
+      result = result.concat(Object.keys(manifest[type]));
     });
-
-    return newPatterns;
-  }
-
-  async bailout(patterns: Array<string>, workspaceLayout: ?WorkspaceLayout): Promise<boolean> {
-    // const lockfileCache = this.lockfile.cache;
-    // if (!lockfileCache) {
-    //   return false;
-    // }
-    // const match = await this.integrityChecker.check(patterns, lockfileCache, this.flags, workspaceLayout);
-    // const haveLockfile = await fs.exists(path.join(this.config.lockfileFolder, constants.LOCKFILE_FILENAME));
-    // if (match.integrityFileMissing && haveLockfile) {
-    //   // Integrity file missing, force script installations
-    //   this.scripts.setForce(true);
-    // }
-    return false;
+    return result;
   }
 
   fetchRequestFromCwd(): Promise<InstallCwdRequest> {
-    return Install.prototype.fetchRequestFromCwd.call(this, this.siblingWorkspaces);
+    return Install.prototype.fetchRequestFromCwd.call(this, this.nonWorkspaceDeps);
   }
 
-  _iterateAddedPackages(
-    f: (pattern: string, registry: string, dependencyType: string, pkgName: string, version: string) => void,
-  ) {
-    const patternOrigins = Object.keys(this.rootPatternsToOrigin);
-
-    // add new patterns to their appropriate registry manifest
-    for (const pattern of this.siblingWorkspaces) {
-      const pkg = this.resolver.getResolvedPattern(pattern);
-      invariant(pkg, `missing package ${pattern}`);
-      const version = this.getPatternVersion(pattern, pkg);
-      const ref = pkg._reference;
-      invariant(ref, 'expected package reference');
-      // lookup the package to determine dependency type; used during `yarn upgrade`
-      const depType = patternOrigins.reduce((acc, prev) => {
-        if (prev.indexOf(`${pkg.name}@`) === 0) {
-          return this.rootPatternsToOrigin[prev];
-        }
-        return acc;
-      }, null);
-
-      // depType is calculated when `yarn upgrade` command is used
-      const target = depType || this.flagToOrigin;
-
-      f(pattern, ref.registry, target, pkg.name, version);
-    }
+  async bailout(patterns: Array<string>, workspaceLayout: ?WorkspaceLayout): Promise<boolean> {
+    return false;
   }
 }
 

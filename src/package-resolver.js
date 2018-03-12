@@ -22,6 +22,7 @@ export type ResolverOptions = {|
   isFlat?: boolean,
   isFrozen?: boolean,
   workspaceLayout?: WorkspaceLayout,
+  shallow?: boolean,
 |};
 
 export default class PackageResolver {
@@ -33,6 +34,7 @@ export default class PackageResolver {
     this.resolutionMap = resolutionMap;
     this.usedRegistries = new Set();
     this.flat = false;
+    this.shallow = false;
 
     this.reporter = config.reporter;
     this.lockfile = lockfile;
@@ -44,6 +46,8 @@ export default class PackageResolver {
   flat: boolean;
 
   frozen: boolean;
+
+  shallow: boolean;
 
   workspaceLayout: ?WorkspaceLayout;
 
@@ -532,11 +536,12 @@ export default class PackageResolver {
 
   async init(
     deps: DependencyRequestPatterns,
-    {isFlat, isFrozen, workspaceLayout}: ResolverOptions = {isFlat: false, isFrozen: false, workspaceLayout: undefined},
+    {isFlat, isFrozen, workspaceLayout, shallow}: ResolverOptions = {isFlat: false, isFrozen: false, workspaceLayout: undefined, shallow: false},
   ): Promise<void> {
     this.flat = Boolean(isFlat);
     this.frozen = Boolean(isFrozen);
     this.workspaceLayout = workspaceLayout;
+    this.shallow = shallow;
     const activity = (this.activity = this.reporter.activity());
 
     for (const req of deps) {
