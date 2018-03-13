@@ -22,7 +22,7 @@ export type ResolverOptions = {|
   isFlat?: boolean,
   isFrozen?: boolean,
   workspaceLayout?: WorkspaceLayout,
-  shallow?: boolean,
+  isolated?: boolean,
 |};
 
 export default class PackageResolver {
@@ -34,7 +34,7 @@ export default class PackageResolver {
     this.resolutionMap = resolutionMap;
     this.usedRegistries = new Set();
     this.flat = false;
-    this.shallow = false;
+    this.isolated = false;
 
     this.reporter = config.reporter;
     this.lockfile = lockfile;
@@ -47,7 +47,7 @@ export default class PackageResolver {
 
   frozen: boolean;
 
-  shallow: boolean;
+  isolated: boolean;
 
   workspaceLayout: ?WorkspaceLayout;
 
@@ -536,17 +536,21 @@ export default class PackageResolver {
 
   async init(
     deps: DependencyRequestPatterns,
-    {isFlat, isFrozen, workspaceLayout, shallow}: ResolverOptions = {isFlat: false, isFrozen: false, workspaceLayout: undefined, shallow: false},
+    {isFlat, isFrozen, workspaceLayout, isolated}: ResolverOptions = {isFlat: false, isFrozen: false, workspaceLayout: undefined, isolated: false},
   ): Promise<void> {
     this.flat = Boolean(isFlat);
     this.frozen = Boolean(isFrozen);
     this.workspaceLayout = workspaceLayout;
-    this.shallow = shallow;
+    this.isolated = isolated;
     const activity = (this.activity = this.reporter.activity());
 
     for (const req of deps) {
       await this.find(req);
     }
+
+    // if(this.isolated){
+    //   this._removeNonWorkspaceRequests();
+    // }
 
     // all required package versions have been discovered, so now packages that
     // resolved to existing versions can be resolved to their best available version
@@ -644,5 +648,21 @@ export default class PackageResolver {
     }
 
     return req;
+  }
+
+  _removeNonWorkspaceRequests(){
+    let allWorkspaces = Object.keys(this.workspaceLayout.workspaces);
+    Object.keys(this.patterns).forEach(pattern => {
+      if(!allWorkspaces.some(w => pattern.startsWith(w))){
+        delete this.patterns[pattern];
+      }
+    });
+
+    Object.keys(this.patternsByPackage).forEach(pattern => {
+      if(!allWorkspaces.includes(pattern)){
+        delete this.patternsByPackage[pattern];
+      }
+    });
+    this.delayedResolveQueue = this.delayedResolveQueue.filter(({info}) => allWorkspaces.includes(info.name));
   }
 }

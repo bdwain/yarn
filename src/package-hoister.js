@@ -69,7 +69,7 @@ export class HoistManifest {
 }
 
 export default class PackageHoister {
-  constructor(config: Config, resolver: PackageResolver, {ignoreOptional}: {ignoreOptional: ?boolean} = {}) {
+  constructor(config: Config, resolver: PackageResolver, {ignoreOptional, isolated}: {ignoreOptional: ?boolean, isolated: ?boolean} = {}) {
     this.resolver = resolver;
     this.config = config;
 
@@ -79,12 +79,15 @@ export default class PackageHoister {
     this.levelQueue = [];
     this.tree = new Map();
 
+    this.isolated = isolated;
+
     this.nohoistResolver = new NohoistResolver(config, resolver);
   }
 
   resolver: PackageResolver;
   config: Config;
   nohoistResolver: NohoistResolver;
+  isolated: boolean;
 
   ignoreOptional: ?boolean;
 

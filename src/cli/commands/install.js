@@ -329,13 +329,13 @@ export class Install {
         }
       };
 
-      if (cwdIsRoot || this.flags.isolated) {
+      if (cwdIsRoot) {
         pushDeps('dependencies', projectManifestJson, {hint: null, optional: false}, true);
         pushDeps('devDependencies', projectManifestJson, {hint: 'dev', optional: false}, !this.config.production);
         pushDeps('optionalDependencies', projectManifestJson, {hint: 'optional', optional: true}, true);
       }
 
-      if (this.config.workspaceRootFolder && !this.flags.isolated) {
+      if (this.config.workspaceRootFolder) {
         const workspaceLoc = cwdIsRoot ? loc : path.join(this.config.lockfileFolder, filename);
         const workspacesRoot = path.dirname(workspaceLoc);
 
@@ -552,7 +552,7 @@ export class Install {
           isFlat: this.flags.flat,
           isFrozen: this.flags.frozenLockfile,
           workspaceLayout,
-          shallow: this.flags.isolated,
+          isolated: this.flags.isolated,
         });
         topLevelPatterns = this.preparePatterns(rawPatterns);
         flattenedTopLevelPatterns = await this.flatten(topLevelPatterns);

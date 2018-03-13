@@ -281,12 +281,10 @@ export default class PackageLinker {
       }
     };
 
-    if(!isolated){
-      await findExtraneousFiles(this.config.lockfileFolder);
-      if (workspaceLayout) {
-        for (const workspaceName of Object.keys(workspaceLayout.workspaces)) {
-          await findExtraneousFiles(workspaceLayout.workspaces[workspaceName].loc);
-        }
+    await findExtraneousFiles(this.config.lockfileFolder);
+    if (workspaceLayout) {
+      for (const workspaceName of Object.keys(workspaceLayout.workspaces)) {
+        await findExtraneousFiles(workspaceLayout.workspaces[workspaceName].loc);
       }
     }
 
@@ -597,9 +595,7 @@ export default class PackageLinker {
     workspaceLayout?: WorkspaceLayout,
     {linkDuplicates, ignoreOptional, isolated}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean, isolated: ?boolean} = {},
   ): Promise<void> {
-    if(!isolated){
-      this.resolvePeerModules();
-    }
+    this.resolvePeerModules();
     await this.copyModules(patterns, workspaceLayout, {linkDuplicates, ignoreOptional, isolated});
   }
 }

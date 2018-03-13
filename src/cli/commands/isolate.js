@@ -21,12 +21,11 @@ import semver from 'semver';
 
 export class Isolate extends Install {
   constructor(flags: Object, config: Config, reporter: Reporter, lockfile: Lockfile) {
-    const workspaceRootIsCwd = config.cwd === config.lockfileFolder;
-    const _flags = flags ? {...flags, workspaceRootIsCwd, isolated: true} : {workspaceRootIsCwd, isolated: true};
+    const _flags = flags ? {...flags, isolated: true} : {isolated: true};
     super(_flags, config, reporter, lockfile);
   }
 
-  nonWorkspaceDeps: Array<string>;
+  siblingWorkspaceDeps: Array<string>;
 
   async init(): Promise<Array<string>> {
     // running "yarn isolate" in a workspace root is not allowed
@@ -34,14 +33,14 @@ export class Isolate extends Install {
       throw new MessageError(this.reporter.lang('workspacesIsolateRootCheck'));
     }
 
-    await this.setNonWorkspaceDeps();
+    await this._setSiblingDeps();
     
     const patterns = await Install.prototype.init.call(this);
     return patterns;
   }
 
-  async setNonWorkspaceDeps(): Array<string>{
-    this.nonWorkspaceDeps = [];
+  async _setSiblingDeps(): Array<string>{
+    this.siblingWorkspaceDeps = [];
 
     let foundRegistry = false, rootLoc, workspaceLoc;
     for (const registry of Object.keys(registries)) {
@@ -67,8 +66,12 @@ export class Isolate extends Install {
     const workspaceManifest = await this.config.readJson(workspaceLoc);
     await normalizeManifest(workspaceManifest, this.config.cwd, this.config, false);
 
-    const allWorkspaces = Object.keys(await this.config.resolveWorkspaces(this.config.lockfileFolder, rootManifest));
-    this.nonWorkspaceDeps = this._getAllWorkspaceDeps(workspaceManifest).filter(w => !allWorkspaces.includes(w));
+    const allWorkspaces = await this.config.resolveWorkspaces(this.config.lockfileFolder, rootManifest);
+    const allWorkspaceNames = Object.keys(allWorkspaces);
+    this.siblingWorkspaceDeps = this._getAllWorkspaceDeps(workspaceManifest).filter(w => allWorkspaceNames.includes(w));
+    this.siblingWorkspaceDeps = this.siblingWorkspaceDeps.map(w => {
+      return `${w}@${allWorkspaces[w].manifest.version}`;
+    });
   }
 
   _getAllWorkspaceDeps(manifest: Object): Array<string>{
@@ -83,8 +86,23 @@ export class Isolate extends Install {
     return result;
   }
 
-  fetchRequestFromCwd(): Promise<InstallCwdRequest> {
-    return Install.prototype.fetchRequestFromCwd.call(this, this.nonWorkspaceDeps);
+  prepareRequests(requests: DependencyRequestPatterns): DependencyRequestPatterns {
+    //const requestsWithArgs = [];
+    const requestsWithArgs = requests.slice();
+
+    for (const pattern of this.siblingWorkspaceDeps) {
+      requestsWithArgs.push({
+        pattern,
+        registry: 'npm',
+        optional: false,
+      });
+    }
+    return requestsWithArgs;
+  }
+
+  preparePatterns(patterns: Array<string>): Array<string> {
+    //return this.siblingWorkspaceDeps;
+    return patterns.concat(this.siblingWorkspaceDeps);
   }
 
   async bailout(patterns: Array<string>, workspaceLayout: ?WorkspaceLayout): Promise<boolean> {
