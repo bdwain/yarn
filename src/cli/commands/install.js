@@ -638,9 +638,8 @@ export class Install {
     // fin!
     // The second condition is to make sure lockfile can be updated when running `remove` command.
     if (
-      !this.flags.isolated &&
-      (topLevelPatterns.length ||
-      (await fs.exists(path.join(this.config.lockfileFolder, constants.LOCKFILE_FILENAME))))
+      topLevelPatterns.length ||
+      (await fs.exists(path.join(this.config.lockfileFolder, constants.LOCKFILE_FILENAME)))
     ) {
       await this.saveLockfileAndIntegrity(topLevelPatterns, workspaceLayout);
     } else if(!this.flags.isolated){
