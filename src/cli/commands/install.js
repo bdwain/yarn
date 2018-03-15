@@ -804,14 +804,16 @@ export class Install {
       await this.pruneOfflineMirror(lockfileBasedOnResolver);
     }
 
-    // write integrity hash
-    await this.integrityChecker.save(
-      patterns,
-      lockfileBasedOnResolver,
-      this.flags,
-      workspaceLayout,
-      this.scripts.getArtifacts(),
-    );
+    if(!this.flags.isolated){
+      // write integrity hash
+      await this.integrityChecker.save(
+        patterns,
+        lockfileBasedOnResolver,
+        this.flags,
+        workspaceLayout,
+        this.scripts.getArtifacts(),
+      );
+    }
 
     // --no-lockfile or --pure-lockfile or --frozen-lockfile flag
     if (this.flags.lockfile === false || this.flags.pureLockfile || this.flags.frozenLockfile) {
