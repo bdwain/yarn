@@ -7,7 +7,7 @@ import type Config from './config.js';
 import type {HoistManifestTuples, HoistManifestTuple} from './package-hoister.js';
 import type {CopyQueueItem} from './util/fs.js';
 import type {InstallArtifacts} from './package-install-scripts.js';
-import PackageHoister from './package-hoister.js';
+import PackageHoister, {HoistManifest} from './package-hoister.js';
 import * as constants from './constants.js';
 import * as promise from './util/promise.js';
 import {entries} from './util/misc.js';
@@ -148,18 +148,20 @@ export default class PackageLinker {
     }
   }
 
-  getFlatHoistedTree(patterns: Array<string>, {ignoreOptional}: {ignoreOptional: ?boolean} = {}): HoistManifestTuples {
+  getFlatHoistedTree(patterns: Array<string>, shallowPatterns: Array<string>, {ignoreOptional}: {ignoreOptional: ?boolean} = {}): HoistManifestTuples {
     const hoister = new PackageHoister(this.config, this.resolver, {ignoreOptional});
-    hoister.seed(patterns);
+    hoister.seed(patterns, shallowPatterns);
     return hoister.init();
   }
 
   async copyModules(
     patterns: Array<string>,
+    shallowPatterns: Array<string>,
     workspaceLayout?: WorkspaceLayout,
-    {linkDuplicates, ignoreOptional, isolated}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean, isolated: ?boolean} = {},
+    {linkDuplicates, ignoreOptional}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean} = {},
   ): Promise<void> {
-    let flatTree = this.getFlatHoistedTree(patterns, {ignoreOptional});
+    let flatTree = this.getFlatHoistedTree(patterns, shallowPatterns, {ignoreOptional});
+
     // sorted tree makes file creation and copying not to interfere with each other
     flatTree = flatTree.sort(function(dep1, dep2): number {
       return dep1[0].localeCompare(dep2[0]);
@@ -592,10 +594,11 @@ export default class PackageLinker {
 
   async init(
     patterns: Array<string>,
+    shallowPatterns: Array<string>,
     workspaceLayout?: WorkspaceLayout,
-    {linkDuplicates, ignoreOptional, isolated}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean, isolated: ?boolean} = {},
+    {linkDuplicates, ignoreOptional}: {linkDuplicates: ?boolean, ignoreOptional: ?boolean} = {},
   ): Promise<void> {
     this.resolvePeerModules();
-    await this.copyModules(patterns, workspaceLayout, {linkDuplicates, ignoreOptional, isolated});
+    await this.copyModules(patterns, shallowPatterns, workspaceLayout, {linkDuplicates, ignoreOptional});
   }
 }

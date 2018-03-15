@@ -24,6 +24,7 @@ export type DependencyRequestPattern = {
   parentRequest?: ?PackageRequest,
   workspaceName?: string,
   workspaceLoc?: string,
+  isolated?: boolean
 };
 export type DependencyRequestPatterns = Array<DependencyRequestPattern>;
 

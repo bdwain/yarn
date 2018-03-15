@@ -34,6 +34,7 @@ export default class PackageReference {
     this.incompatible = false;
     this.fresh = false;
     this.location = null;
+    this.shallow = request.shallow;
     this.addRequest(request);
   }
 
@@ -57,6 +58,7 @@ export default class PackageReference {
   registry: RegistryNames;
   location: ?string;
   resolver: PackageResolver;
+  shallow: ?boolean;
 
   setFresh(fresh: boolean) {
     this.fresh = fresh;
@@ -96,7 +98,12 @@ export default class PackageReference {
   }
 
   addPattern(pattern: string, manifest: Manifest) {
-    this.resolver.addPattern(pattern, manifest);
+    if(this.shallow){
+      this.resolver.addShallowPattern(pattern, manifest);
+    }
+    else{
+      this.resolver.addPattern(pattern, manifest);
+    }
 
     this.patterns.push(pattern);
 

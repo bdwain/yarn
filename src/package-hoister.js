@@ -69,17 +69,16 @@ export class HoistManifest {
 }
 
 export default class PackageHoister {
-  constructor(config: Config, resolver: PackageResolver, {ignoreOptional, isolated}: {ignoreOptional: ?boolean, isolated: ?boolean} = {}) {
+  constructor(config: Config, resolver: PackageResolver, {ignoreOptional}: {ignoreOptional: ?boolean} = {}) {
     this.resolver = resolver;
     this.config = config;
 
     this.ignoreOptional = ignoreOptional;
-
     this.taintedKeys = new Map();
     this.levelQueue = [];
     this.tree = new Map();
+    this.shallowTree = new Map();
 
-    this.isolated = isolated;
 
     this.nohoistResolver = new NohoistResolver(config, resolver);
   }
@@ -87,12 +86,12 @@ export default class PackageHoister {
   resolver: PackageResolver;
   config: Config;
   nohoistResolver: NohoistResolver;
-  isolated: boolean;
 
   ignoreOptional: ?boolean;
 
   levelQueue: Array<[string, HoistManifest]>;
   tree: Map<string, HoistManifest>;
+  shallowTree: Map<string, HoistManifest>;
   taintedKeys: Map<string, HoistManifest>;
 
   /**
@@ -121,7 +120,7 @@ export default class PackageHoister {
    * Seed the hoister with patterns taken from the included resolver.
    */
 
-  seed(patterns: Array<string>) {
+  seed(patterns: Array<string>, shallowPatterns: Array<string>) {
     this.prepass(patterns);
 
     for (const pattern of this.resolver.dedupePatterns(patterns)) {
@@ -132,7 +131,7 @@ export default class PackageHoister {
       let queue = this.levelQueue;
       if (!queue.length) {
         this._propagateRequired();
-        return;
+        break;
       }
 
       this.levelQueue = [];
@@ -182,6 +181,25 @@ export default class PackageHoister {
           this.hoist(info);
         }
       }
+    }
+    this._seedShallow(shallowPatterns);
+  }
+
+  /**
+   * Seed the hoister with shallow patterns
+   */
+
+  _seedShallow(patterns: Array<string>) {
+    for(const pattern of patterns){
+      const pkg = this.resolver.getStrictResolvedShallowPattern(pattern);
+      const ref = pkg._reference;
+      invariant(ref, 'expected reference');
+
+      const loc: string = this.config.generateHardModulePath(ref);
+      const parts = [pkg.name];
+      const key: string = this.implodeKey(parts);
+      const info: HoistManifest = new HoistManifest(key, parts, pkg, loc, true, true, ref.incompatible);
+      this.shallowTree.set(info.pkg.name, info);
     }
   }
 
@@ -660,7 +678,7 @@ export default class PackageHoister {
     const flatTree = [];
 
     //
-    for (const [key, info] of this.tree.entries()) {
+    for (const [key, info] of [...this.tree, ...this.shallowTree]) {
       // decompress the location and push it to the flat tree. this path could be made
       // up of modules from different registries so we need to handle this specially
       const parts: Array<string> = [];
@@ -678,8 +696,9 @@ export default class PackageHoister {
         // hardcoded modules folder
         parts.splice(0, 1, this.config.modulesFolder);
       } else {
+        const folder = info.pkg._reference.shallow ? this.config.cwd : this.config.lockfileFolder;
         // first part will be the registry-specific module folder
-        parts.splice(0, 0, this.config.lockfileFolder);
+        parts.splice(0, 0, folder);
       }
 
       const loc = path.join(...parts);

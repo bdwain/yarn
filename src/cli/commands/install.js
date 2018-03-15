@@ -521,6 +521,7 @@ export class Install {
     }
 
     let flattenedTopLevelPatterns: Array<string> = [];
+    let shallowPatterns: Array<string> = [];
     const steps: Array<(curr: number, total: number) => Promise<{bailout: boolean} | void>> = [];
     const {
       requests: depRequests,
@@ -551,11 +552,11 @@ export class Install {
         await this.resolver.init(this.prepareRequests(depRequests), {
           isFlat: this.flags.flat,
           isFrozen: this.flags.frozenLockfile,
-          workspaceLayout,
-          isolated: this.flags.isolated,
+          workspaceLayout
         });
         topLevelPatterns = this.preparePatterns(rawPatterns);
         flattenedTopLevelPatterns = await this.flatten(topLevelPatterns);
+        shallowPatterns = this.resolver.getShallowPatterns();
         return {bailout: await this.bailout(topLevelPatterns, workspaceLayout)};
       }),
     );
@@ -566,6 +567,7 @@ export class Install {
         this.reporter.step(curr, total, this.reporter.lang('fetchingPackages'), emoji.get('truck'));
         const manifests: Array<Manifest> = await fetcher.fetch(this.resolver.getManifests(), this.config);
         this.resolver.updateManifests(manifests);
+        await fetcher.fetch(this.resolver.getManifests(true), this.config);
         await compatibility.check(this.resolver.getManifests(), this.config, this.flags.ignoreEngines);
       }),
     );
@@ -580,10 +582,9 @@ export class Install {
           manifest,
           this.config.lockfileFolder === this.config.cwd,
         );
-        await this.linker.init(flattenedTopLevelPatterns, workspaceLayout, {
+        await this.linker.init(flattenedTopLevelPatterns, shallowPatterns, workspaceLayout, {
           linkDuplicates: this.flags.linkDuplicates,
-          ignoreOptional: this.flags.ignoreOptional,
-          isolated: this.flags.isolated
+          ignoreOptional: this.flags.ignoreOptional
         });
       }),
     );

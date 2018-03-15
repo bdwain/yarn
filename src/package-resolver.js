@@ -21,12 +21,12 @@ const semver = require('semver');
 export type ResolverOptions = {|
   isFlat?: boolean,
   isFrozen?: boolean,
-  workspaceLayout?: WorkspaceLayout,
-  isolated?: boolean,
+  workspaceLayout?: WorkspaceLayout
 |};
 
 export default class PackageResolver {
   constructor(config: Config, lockfile: Lockfile, resolutionMap: ResolutionMap = new ResolutionMap(config)) {
+    this.shallowPatterns = map();
     this.patternsByPackage = map();
     this.fetchingPatterns = new Set();
     this.fetchingQueue = new BlockingQueue('resolver fetching');
@@ -34,7 +34,6 @@ export default class PackageResolver {
     this.resolutionMap = resolutionMap;
     this.usedRegistries = new Set();
     this.flat = false;
-    this.isolated = false;
 
     this.reporter = config.reporter;
     this.lockfile = lockfile;
@@ -46,8 +45,6 @@ export default class PackageResolver {
   flat: boolean;
 
   frozen: boolean;
-
-  isolated: boolean;
 
   workspaceLayout: ?WorkspaceLayout;
 
@@ -81,6 +78,11 @@ export default class PackageResolver {
 
   // a map of dependency patterns to packages
   patterns: {
+    [packagePattern: string]: Manifest,
+  };
+
+  // a map of shallow dependency patterns to packages
+  shallowPatterns: {
     [packagePattern: string]: Manifest,
   };
 
@@ -263,12 +265,14 @@ export default class PackageResolver {
    * Get a flat list of all package info.
    */
 
-  getManifests(): Array<Manifest> {
+  getManifests(shallow: boolean = false): Array<Manifest> {
     const infos = [];
     const seen = new Set();
 
-    for (const pattern in this.patterns) {
-      const info = this.patterns[pattern];
+    const patterns = shallow ? this.shallowPatterns : this.patterns;
+
+    for (const pattern in patterns) {
+      const info = patterns[pattern];
       if (seen.has(info)) {
         continue;
       }
@@ -359,6 +363,17 @@ export default class PackageResolver {
     byName.push(pattern);
   }
 
+  addShallowPattern(pattern: string, info: Manifest) {
+    this.shallowPatterns[pattern] = info;
+
+    // const byName = (this.shallowPatternsByPackage[info.name] = this.shallowPatternsByPackage[info.name] || []);
+    // byName.push(pattern);
+  }
+
+  getShallowPatterns(){
+    return Object.keys(this.shallowPatterns);
+  }
+
   /**
    * TODO description
    */
@@ -396,6 +411,15 @@ export default class PackageResolver {
     return manifest;
   }
 
+  /**
+   * TODO description
+   */
+
+  getStrictResolvedShallowPattern(pattern: string): ?Manifest {
+    const manifest = this.shallowPatterns[pattern];
+    invariant(manifest, 'expected shallow manifest');
+    return manifest;
+  }
   /**
    * TODO description
    */
@@ -536,21 +560,16 @@ export default class PackageResolver {
 
   async init(
     deps: DependencyRequestPatterns,
-    {isFlat, isFrozen, workspaceLayout, isolated}: ResolverOptions = {isFlat: false, isFrozen: false, workspaceLayout: undefined, isolated: false},
+    {isFlat, isFrozen, workspaceLayout}: ResolverOptions = {isFlat: false, isFrozen: false, workspaceLayout: undefined},
   ): Promise<void> {
     this.flat = Boolean(isFlat);
     this.frozen = Boolean(isFrozen);
     this.workspaceLayout = workspaceLayout;
-    this.isolated = isolated;
     const activity = (this.activity = this.reporter.activity());
 
     for (const req of deps) {
       await this.find(req);
     }
-
-    // if(this.isolated){
-    //   this._removeNonWorkspaceRequests();
-    // }
 
     // all required package versions have been discovered, so now packages that
     // resolved to existing versions can be resolved to their best available version
@@ -648,21 +667,5 @@ export default class PackageResolver {
     }
 
     return req;
-  }
-
-  _removeNonWorkspaceRequests(){
-    let allWorkspaces = Object.keys(this.workspaceLayout.workspaces);
-    Object.keys(this.patterns).forEach(pattern => {
-      if(!allWorkspaces.some(w => pattern.startsWith(w))){
-        delete this.patterns[pattern];
-      }
-    });
-
-    Object.keys(this.patternsByPackage).forEach(pattern => {
-      if(!allWorkspaces.includes(pattern)){
-        delete this.patternsByPackage[pattern];
-      }
-    });
-    this.delayedResolveQueue = this.delayedResolveQueue.filter(({info}) => allWorkspaces.includes(info.name));
   }
 }

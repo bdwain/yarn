@@ -87,7 +87,6 @@ export class Isolate extends Install {
   }
 
   prepareRequests(requests: DependencyRequestPatterns): DependencyRequestPatterns {
-    //const requestsWithArgs = [];
     const requestsWithArgs = requests.slice();
 
     for (const pattern of this.siblingWorkspaceDeps) {
@@ -95,14 +94,10 @@ export class Isolate extends Install {
         pattern,
         registry: 'npm',
         optional: false,
+        shallow: true
       });
     }
     return requestsWithArgs;
-  }
-
-  preparePatterns(patterns: Array<string>): Array<string> {
-    //return this.siblingWorkspaceDeps;
-    return patterns.concat(this.siblingWorkspaceDeps);
   }
 
   async bailout(patterns: Array<string>, workspaceLayout: ?WorkspaceLayout): Promise<boolean> {
